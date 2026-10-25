@@ -48,6 +48,18 @@
 - [ ] Smoke API: auth→catalog→create reading→history→quota→premium gating (TestClient/httpx).
 - [ ] Проверка безопасности: подпись, auth_date expiry, обход dev-auth в production, лимиты.
 
+## Статус git (проверено 2026-10-25)
+- Локальная ветка `qwen-code-7348fb8f-...` содержит ВСЕ три коммита: `9ed49d4` ← `c1e5b64` ← `bcf3fd8` (HEAD = 9ed49d4, рабочее дерево чистое).
+- GitHub-ветка `creating-a-product-from-md-e052d` — это ДРУГАЯ ветка (указывает на `bcf3fd8`); она не обязана показывать более поздние коммиты локальной ветки.
+- **Push в GitHub из этой среды невозможен**: клон был сделан без учётных данных (remote.origin.url отсутствовал; после восстановления URL github.com требует Username/Password, токена в окружении нет). Это ограничение среды, а не потеря изменений.
+- Резервная копия всей истории создана: `/workspace/backup-tarot-progress.bundle` (git bundle verify — okay, complete history, оба ref'а).
+- Как опубликовать вручную с машины с доступом к GitHub:
+  ```bash
+  git clone --bundle /workspace/backup-tarot-progress.bundle restored && cd restored
+  git push <remote-url> main:refs/heads/qwen-progress
+  # либо просто: git push origin qwen-code-7348fb8f-890c-42e7-a001-8630636e052d
+  ```
+
 ## Команды окружения
 ```bash
 # backend

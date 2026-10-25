@@ -3,3 +3,6 @@ __pycache__/
 .env
 .env.local
 .env.*
+
+# Git bundle backup (local progress snapshot)
+backup-tarot-progress.bundle
