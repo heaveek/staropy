@@ -1,0 +1,288 @@
+"""Tag categories and tags (spec 6.2). ~150 tags is a guideline, not a quota."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class TagCategoryDef:
+    code: str
+    name_ru: str
+    description: str
+
+
+@dataclass(frozen=True)
+class TagDef:
+    code: str
+    name_ru: str
+    category: str  # category code
+
+
+CATEGORIES: list[TagCategoryDef] = [
+    TagCategoryDef("events", "События", "Внешние события и повороты"),
+    TagCategoryDef("emotions", "Эмоции", "Чувства и эмоциональные состояния"),
+    TagCategoryDef("relationships", "Отношения", "Люди, связи, взаимодействие"),
+    TagCategoryDef("career", "Карьера", "Работа, дело, профессиональная сфера"),
+    TagCategoryDef("finance", "Финансы", "Деньги и ресурсы"),
+    TagCategoryDef("spiritual", "Духовность", "Смысл, интуиция, внутренняя работа"),
+    TagCategoryDef("actions", "Действия", "Что можно делать"),
+    TagCategoryDef("obstacles", "Препятствия", "Что мешает и требует внимания"),
+    TagCategoryDef("personality", "Личность", "Черты и состояния вопрошающего"),
+    TagCategoryDef("energy", "Энергия", "Уровень и характер энергии"),
+    TagCategoryDef("time", "Время", "Темп и этап процесса"),
+    TagCategoryDef("result", "Результат", "Возможные итоги и направления"),
+]
+
+_TAGS: list[tuple[str, str, str]] = [
+    # events
+    ("new_beginning", "Новое начало", "events"),
+    ("ending", "Завершение", "events"),
+    ("change", "Перемены", "events"),
+    ("turning_point", "Поворотный момент", "events"),
+    ("unexpected_event", "Неожиданное событие", "events"),
+    ("meeting", "Встреча", "events"),
+    ("departure", "Отъезд или переезд", "events"),
+    ("arrival", "Прибытие, получение", "events"),
+    ("celebration", "Праздник", "events"),
+    ("news", "Новости", "events"),
+    ("opportunity", "Возможность", "events"),
+    ("risk_event", "Риск", "events"),
+    ("delay", "Задержка", "events"),
+    ("stability_event", "Стабильность", "events"),
+    ("crisis", "Кризис", "events"),
+    ("recovery", "Восстановление", "events"),
+    ("recognition", "Признание", "events"),
+    ("loss", "Потеря", "events"),
+    ("gain", "Приобретение", "events"),
+    ("competition_event", "Соревнование", "events"),
+    # emotions
+    ("joy", "Радость", "emotions"),
+    ("love_feeling", "Любовь", "emotions"),
+    ("tenderness", "Нежность", "emotions"),
+    ("passion", "Страсть", "emotions"),
+    ("gratitude", "Благодарность", "emotions"),
+    ("hope", "Надежда", "emotions"),
+    ("inspiration", "Вдохновение", "emotions"),
+    ("calm", "Спокойствие", "emotions"),
+    ("confidence", "Уверенность", "emotions"),
+    ("fear", "Страх", "emotions"),
+    ("anxiety", "Тревога", "emotions"),
+    ("sadness", "Печаль", "emotions"),
+    ("grief", "Горе", "emotions"),
+    ("anger", "Гнев", "emotions"),
+    ("jealousy", "Ревность", "emotions"),
+    ("shame", "Стыд", "emotions"),
+    ("guilt", "Вина", "emotions"),
+    ("loneliness", "Одиночество", "emotions"),
+    ("nostalgia", "Ностальгия", "emotions"),
+    ("confusion", "Растерянность", "emotions"),
+    ("doubt", "Сомнение", "emotions"),
+    ("burnout", "Истощение чувств", "emotions"),
+    # relationships
+    ("partnership", "Партнёрство", "relationships"),
+    ("marriage", "Брак, союз", "relationships"),
+    ("friendship", "Дружба", "relationships"),
+    ("family", "Семья", "relationships"),
+    ("romance", "Романтика", "relationships"),
+    ("reconciliation", "Примирение", "relationships"),
+    ("separation", "Расставание", "relationships"),
+    ("trust", "Доверие", "relationships"),
+    ("betrayal", "Предательство", "relationships"),
+    ("honesty_rel", "Честность", "relationships"),
+    ("support", "Поддержка", "relationships"),
+    ("conflict", "Конфликт", "relationships"),
+    ("boundaries", "Личные границы", "relationships"),
+    ("dependence", "Зависимость", "relationships"),
+    ("mentor", "Наставник", "relationships"),
+    ("rival", "Соперник", "relationships"),
+    ("community", "Окружение, сообщество", "relationships"),
+    ("communication", "Общение", "relationships"),
+    ("courtship", "Ухаживание", "relationships"),
+    ("commitment", "Обязательство", "relationships"),
+    # career
+    ("job", "Работа", "career"),
+    ("project", "Проект", "career"),
+    ("promotion", "Повышение", "career"),
+    ("hiring", "Найм, собеседование", "career"),
+    ("firing", "Увольнение", "career"),
+    ("business", "Своё дело", "career"),
+    ("teamwork", "Командная работа", "career"),
+    ("leadership", "Руководство", "career"),
+    ("responsibility", "Ответственность", "career"),
+    ("discipline", "Дисциплина", "career"),
+    ("creativity_work", "Творчество в деле", "career"),
+    ("learning", "Обучение", "career"),
+    ("teaching", "Обучение других", "career"),
+    ("routine", "Рутина", "career"),
+    ("overwork", "Перегрузка", "career"),
+    ("vocation", "Призвание", "career"),
+    ("negotiation", "Переговоры", "career"),
+    ("strategy", "Стратегия", "career"),
+    ("decision", "Решение", "career"),
+    ("networking", "Полезные связи", "career"),
+    # finance
+    ("money", "Деньги", "finance"),
+    ("income", "Доход", "finance"),
+    ("expense", "Расходы", "finance"),
+    ("debt", "Долг", "finance"),
+    ("savings", "Сбережения", "finance"),
+    ("investment", "Вложения", "finance"),
+    ("profit", "Прибыль", "finance"),
+    ("loss_money", "Убыток", "finance"),
+    ("budget", "Планирование бюджета", "finance"),
+    ("generosity", "Щедрость", "finance"),
+    ("scarcity", "Дефицит", "finance"),
+    ("abundance", "Изобилие", "finance"),
+    ("property", "Имущество", "finance"),
+    ("resources", "Ресурсы", "finance"),
+    ("fair_exchange", "Справедливый обмен", "finance"),
+    # spiritual
+    ("intuition", "Интуиция", "spiritual"),
+    ("inner_voice", "Внутренний голос", "spiritual"),
+    ("self_knowledge", "Самопознание", "spiritual"),
+    ("reflection", "Рефлексия", "spiritual"),
+    ("solitude", "уединение", "spiritual"),
+    ("faith", "Вера", "spiritual"),
+    ("mystery", "Неизвестное", "spiritual"),
+    ("dreams", "Сны, воображение", "spiritual"),
+    ("mindfulness", "Осознанность", "spiritual"),
+    ("karma", "Следствия выборов", "spiritual"),
+    ("ritual", "Практика, ритуал", "spiritual"),
+    ("growth", "Внутренний рост", "spiritual"),
+    ("awakening", "Пробуждение", "spiritual"),
+    ("acceptance", "Принятие", "spiritual"),
+    ("forgiveness", "Прощение", "spiritual"),
+    ("purpose", "Смысл", "spiritual"),
+    ("patience_sp", "Терпение души", "spiritual"),
+    ("balance_sp", "Внутренний баланс", "spiritual"),
+    # actions
+    ("start_action", "Начать", "actions"),
+    ("continue", "Продолжать", "actions"),
+    ("stop_action", "Остановиться", "actions"),
+    ("wait", "Выждать", "actions"),
+    ("act_now", "Действовать сейчас", "actions"),
+    ("ask_help", "Попросить помощь", "actions"),
+    ("offer_help", "Предложить помощь", "actions"),
+    ("talk_openly", "Говорить открыто", "actions"),
+    ("listen", "Слушать", "actions"),
+    ("observe", "Наблюдать", "actions"),
+    ("plan", "Планировать", "actions"),
+    ("rest", "Отдыхать", "actions"),
+    ("take_risk", "Рискнуть", "actions"),
+    ("be_cautious", "Быть осторожным", "actions"),
+    ("let_go", "Отпустить", "actions"),
+    ("commit_action", "Обязаться", "actions"),
+    ("adapt", "Адаптироваться", "actions"),
+    ("defend", "Отстаивать", "actions"),
+    ("build", "Созидать", "actions"),
+    ("repair", "Исправлять", "actions"),
+    # obstacles
+    ("blockage", "Тупик", "obstacles"),
+    ("illusion", "Иллюзия", "obstacles"),
+    ("deception", "Обман", "obstacles"),
+    ("hidden_problem", "Скрытая проблема", "obstacles"),
+    ("self_sabotage", "Само саботаж", "obstacles"),
+    ("procrastination", "Промедление", "obstacles"),
+    ("attachment", "Привязанность", "obstacles"),
+    ("limiting_belief", "Ограничивающее убеждение", "obstacles"),
+    ("external_pressure", "Внешнее давление", "obstacles"),
+    ("lack_of_information", "Нехватка информации", "obstacles"),
+    ("exhaustion", "Истощение", "obstacles"),
+    ("chaos", "Хаос", "obstacles"),
+    ("rigidity", "Жёсткость", "obstacles"),
+    ("impulsiveness", "Импульсивность", "obstacles"),
+    ("avoidance", "Избегание", "obstacles"),
+    ("codependency", "Созависимость", "obstacles"),
+    ("toxic_influence", "Токсичное влияние", "obstacles"),
+    ("burden", "Тяжесть обязательств", "obstacles"),
+    ("stagnation", "Застой", "obstacles"),
+    ("distraction", "Рассеянность", "obstacles"),
+    # personality
+    ("curiosity", "Любопытство", "personality"),
+    ("independence", "Независимость", "personality"),
+    ("maturity", "Зрелость", "personality"),
+    ("youthfulness", "Юношеский запал", "personality"),
+    ("wisdom", "Мудрость", "personality"),
+    ("experience", "Опыт", "personality"),
+    ("ambition", "Амбиции", "personality"),
+    ("humility", "Скромность", "personality"),
+    ("charisma", "Харизма", "personality"),
+    ("sensitivity", "Чувствительность", "personality"),
+    ("resilience", "Стойкость", "personality"),
+    ("willpower", "Сила воли", "personality"),
+    ("empathy", "Эмпатия", "personality"),
+    ("skepticism", "Скептицизм", "personality"),
+    ("openness", "Открытость", "personality"),
+    ("caution_type", "Бдительность", "personality"),
+    ("playfulness", "Игривость", "personality"),
+    ("seriousness", "Серьёзность", "personality"),
+    ("self_reliance", "Опора на себя", "personality"),
+    ("perfectionism", "Перфекционизм", "personality"),
+    # energy
+    ("high_energy", "Высокая энергия", "energy"),
+    ("low_energy", "Мало энергии", "energy"),
+    ("drive", "Движение вперёд", "energy"),
+    ("momentum", "Разгон", "energy"),
+    ("slow_energy", "Медленный темп", "energy"),
+    ("focused_energy", "Сосредоточенность", "energy"),
+    ("scattered_energy", "Распылённая энергия", "energy"),
+    ("creative_flow", "Творческий поток", "energy"),
+    ("tension", "Напряжение", "energy"),
+    ("release", "Разрядка", "energy"),
+    ("renewal", "Обновление", "energy"),
+    ("grounded", "Заземлённость", "energy"),
+    ("uplift", "Подъём", "energy"),
+    ("drain", "Утечка энергии", "energy"),
+    ("shielding", "Защита", "energy"),
+    # time
+    ("right_timing", "Подходящее время", "time"),
+    ("wrong_timing", "Неподходящее время", "time"),
+    ("quick_change", "Быстрое изменение", "time"),
+    ("long_process", "Длительный процесс", "time"),
+    ("cycle", "Цикличность", "time"),
+    ("season", "Сезон жизни", "time"),
+    ("past_influence", "Влияние прошлого", "time"),
+    ("present_focus", "Фокус на настоящем", "time"),
+    ("future_potential", "Потенциал будущего", "time"),
+    ("urgency", "Срочность", "time"),
+    ("waiting_time", "Ожидание", "time"),
+    ("mature_late", "Позреет позже", "time"),
+    ("deadline", "Срок", "time"),
+    ("pause", "Пауза", "time"),
+    ("renewal_time", "Новый виток", "time"),
+    # result
+    ("success", "Успех", "result"),
+    ("failure", "Неудача", "result"),
+    ("partial_result", "Частичный результат", "result"),
+    ("breakthrough", "Прорыв", "result"),
+    ("setback", "Откат", "result"),
+    ("harmony", "Гармония", "result"),
+    ("resolution", "Разрешение", "result"),
+    ("open_ending", "Открытый финал", "result"),
+    ("reward", "Награда", "result"),
+    ("consequence", "Последствие", "result"),
+    ("freedom", "Свобода", "result"),
+    ("security", "Безопасность", "result"),
+    ("fulfillment", "Наполненность", "result"),
+    ("empty_effort", "Пустые усилия", "result"),
+    ("lasting_result", "Долговечный итог", "result"),
+]
+
+
+def build_tags() -> list[TagDef]:
+    return [TagDef(code=c, name_ru=n, category=cat) for c, n, cat in _TAGS]
+
+
+TAGS: list[TagDef] = build_tags()
+
+
+def validate_tags() -> list[str]:
+    problems: list[str] = []
+    codes = [t.code for t in TAGS]
+    if len(set(codes)) != len(codes):
+        problems.append("duplicate tag codes")
+    cat_codes = {c.code for c in CATEGORIES}
+    for t in TAGS:
+        if t.category not in cat_codes:
+            problems.append(f"tag {t.code}: unknown category {t.category}")
+    return problems
