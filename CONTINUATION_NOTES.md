@@ -16,13 +16,13 @@
 
 ## ⚠️ Известные проблемы (чинить первыми)
 
-1. **2 падающих теста** в `backend/tests/test_history_preferences.py`: используется несуществующая тема `"health"`. Заменить на валидную (`love` | `work` | `money` | `self_development`). Команда проверки: `cd backend && python -m pytest tests/ -x -q`.
+1. ~~2 падающих теста~~ — ИСПРАВЛЕНО (тема health заменена на валидные). Все 28 backend-тестов проходят.
 2. PostgreSQL локально недоступен — миграции проверены на SQLite; при доступном PG прогнать `alembic upgrade head` на чистой БД.
 
 ## 📋 Оставшиеся задачи (по порядку)
 
 ### Этап 3 (доделать backend)
-- [ ] Починить 2 теста с темой `health`.
+- [x] Починить 2 теста с темой `health` — сделано, 28 passed.
 - [ ] `tests/test_payments.py`: идемпотентность платежей, проверка сумм, выдача Premium только после подтверждённой оплаты (mock Telegram Stars provider, без реального токена).
 - [ ] Smoke-тесты `/healthz`, `/readyz`.
 

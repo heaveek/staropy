@@ -57,7 +57,8 @@ def test_free_history_limited_to_three(client, seed, fresh_tg_id):
     client.get("/api/v1/auth/me", headers=headers)  # create user
     _grant_premium(fresh_tg_id)
     for i in range(5):  # create 5 readings while premium
-        assert _make_reading(client, headers, theme=["love", "work", "money", "self_development", "health"][i]).status_code == 200
+        themes = ["love", "work", "money", "self_development", "love"]
+        assert _make_reading(client, headers, theme=themes[i]).status_code == 200
 
     # revoke premium by expiring entitlements
     from app.db.session import get_session_factory
@@ -82,7 +83,7 @@ def test_history_pagination_cursor(client, seed, fresh_tg_id):
     _grant_premium(fresh_tg_id)
     ids = set()
     for i in range(4):
-        resp = _make_reading(client, headers, theme=["love", "work", "money", "health"][i])
+        resp = _make_reading(client, headers, theme=["love", "work", "money", "self_development"][i])
         ids.add(resp.json()["reading_id"])
 
     page1 = client.get("/api/v1/readings?limit=2", headers=headers).json()
