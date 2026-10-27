@@ -122,7 +122,7 @@ def test_status_endpoint_is_owner_scoped(client, seed, fresh_tg_id):
 
 # ---------------------------------------------------------------- provider contract
 
-def test_stars_provider_uses_create_invoice_link_and_validates_result(monkeypatch):
+def test_stars_provider_uses_create_invoice_link_and_validates_result(client, seed, monkeypatch):
     """sendInvoice returns a Message (no invoice_link); createInvoiceLink
     returns the URL string in `result`. Guard the corrected contract."""
     calls = {}
@@ -168,7 +168,9 @@ def test_stars_provider_uses_create_invoice_link_and_validates_result(monkeypatc
         object.__setattr__(settings, "payment_provider", old_provider)
 
 
-def test_stars_provider_rejects_malformed_result(monkeypatch):
+def test_stars_provider_rejects_malformed_result(client, seed, monkeypatch):
+    """client+seed fixtures guarantee this runs inside the standard token/env
+    context; every settings mutation is restored to its exact previous value."""
     class FakeResp:
         def json(self):
             # sendInvoice-style response: Message object, NOT a link string
@@ -177,7 +179,10 @@ def test_stars_provider_rejects_malformed_result(monkeypatch):
     import httpx
     monkeypatch.setattr(httpx, "post", lambda *a, **k: FakeResp())
     settings = get_settings()
+    old_token = settings.telegram_bot_token
+    old_provider = settings.payment_provider
     object.__setattr__(settings, "telegram_bot_token", "123:token")
+    object.__setattr__(settings, "payment_provider", "telegram_stars")
     try:
         session = get_session_factory()()
         try:
@@ -190,7 +195,8 @@ def test_stars_provider_rejects_malformed_result(monkeypatch):
         finally:
             session.close()
     finally:
-        object.__setattr__(settings, "telegram_bot_token", "")
+        object.__setattr__(settings, "telegram_bot_token", old_token)
+        object.__setattr__(settings, "payment_provider", old_provider)
 
 
 # ---------------------------------------------------------------- confirm_payment
