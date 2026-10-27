@@ -53,9 +53,16 @@ def client():
     from fastapi.testclient import TestClient
     from app.main import create_app
 
-    app = create_app()
-    with TestClient(app) as c:
-        yield c
+    # Defense-in-depth: if an earlier test leaked a settings mutation through
+    # the module-level @lru_cache on get_settings(), rebind the cache to the
+    # pristine environment values so every API test starts from a known state.
+    get_settings.cache_clear()
+    try:
+        app = create_app()
+        with TestClient(app) as c:
+            yield c
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.fixture()

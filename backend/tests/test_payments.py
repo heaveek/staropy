@@ -25,21 +25,36 @@ from tests.conftest import user_headers
 
 # ---------------------------------------------------------------- helpers
 
-class _TogglePayments:
-    """Temporarily flip settings for one test despite @lru_cache on get_settings."""
+class _SettingsPatcher:
+    """Context manager that temporarily overrides fields of the cached Settings
+    instance and ALWAYS restores the exact previous values on exit — even if an
+    inner assertion fails mid-way. This prevents cross-test contamination via
+    the module-level @lru_cache on get_settings()."""
+
+    def __init__(self, **overrides):
+        self._overrides = overrides
+        self._old: dict[str, object] = {}
 
     def __enter__(self):
         settings = get_settings()
-        self._old_enabled = settings.payments_enabled
-        self._old_provider = settings.payment_provider
-        object.__setattr__(settings, "payments_enabled", True)
-        object.__setattr__(settings, "payment_provider", "stub")
+        for field, value in self._overrides.items():
+            self._old[field] = getattr(settings, field)
+            object.__setattr__(settings, field, value)
         return settings
 
     def __exit__(self, *exc):
         settings = get_settings()
-        object.__setattr__(settings, "payments_enabled", self._old_enabled)
-        object.__setattr__(settings, "payment_provider", self._old_provider)
+        for field, value in self._old.items():
+            object.__setattr__(settings, field, value)
+        self._old.clear()
+        return False
+
+
+class _TogglePayments(_SettingsPatcher):
+    """Backwards-compatible helper: enable payments with the stub provider."""
+
+    def __init__(self):
+        super().__init__(payments_enabled=True, payment_provider="stub")
 
 
 def _activate_products(session):
@@ -144,12 +159,7 @@ def test_stars_provider_uses_create_invoice_link_and_validates_result(client, se
     import httpx
     monkeypatch.setattr(httpx, "post", fake_post)
 
-    settings = get_settings()
-    old_token = settings.telegram_bot_token
-    old_provider = settings.payment_provider
-    object.__setattr__(settings, "telegram_bot_token", "123:token")
-    object.__setattr__(settings, "payment_provider", "telegram_stars")
-    try:
+    with _SettingsPatcher(telegram_bot_token="123:token", payment_provider="telegram_stars"):
         session = get_session_factory()()
         try:
             product = session.scalar(select(Product).limit(1))
@@ -163,9 +173,6 @@ def test_stars_provider_uses_create_invoice_link_and_validates_result(client, se
             assert calls["body"]["prices"][0]["amount"] == product.price_amount
         finally:
             session.close()
-    finally:
-        object.__setattr__(settings, "telegram_bot_token", old_token)
-        object.__setattr__(settings, "payment_provider", old_provider)
 
 
 def test_stars_provider_rejects_malformed_result(client, seed, monkeypatch):
@@ -178,12 +185,7 @@ def test_stars_provider_rejects_malformed_result(client, seed, monkeypatch):
 
     import httpx
     monkeypatch.setattr(httpx, "post", lambda *a, **k: FakeResp())
-    settings = get_settings()
-    old_token = settings.telegram_bot_token
-    old_provider = settings.payment_provider
-    object.__setattr__(settings, "telegram_bot_token", "123:token")
-    object.__setattr__(settings, "payment_provider", "telegram_stars")
-    try:
+    with _SettingsPatcher(telegram_bot_token="123:token", payment_provider="telegram_stars"):
         session = get_session_factory()()
         try:
             product = session.scalar(select(Product).limit(1))
@@ -194,9 +196,6 @@ def test_stars_provider_rejects_malformed_result(client, seed, monkeypatch):
             assert res.error == "malformed_invoice_link_response"
         finally:
             session.close()
-    finally:
-        object.__setattr__(settings, "telegram_bot_token", old_token)
-        object.__setattr__(settings, "payment_provider", old_provider)
 
 
 # ---------------------------------------------------------------- confirm_payment
