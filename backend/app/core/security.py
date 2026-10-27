@@ -50,8 +50,12 @@ def verify_init_data(init_data: str, bot_token: str, max_age_seconds: int | None
         auth_date = int(fields["auth_date"])
     except ValueError:
         raise ValueError("invalid_auth_date")
-    if max_age_seconds > 0 and time.time() - auth_date > max_age_seconds:
-        raise ValueError("auth_date_expired")
+    if max_age_seconds > 0:
+        age = time.time() - auth_date
+        # Reject stale data AND dates from the future (clock-skew guard).
+        # Allow a small negative-age tolerance for client/server clock drift.
+        if age > max_age_seconds or age < -300:
+            raise ValueError("auth_date_expired" if age > 0 else "auth_date_in_future")
 
     # Data check string: sorted key=value lines, excluding hash
     data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))

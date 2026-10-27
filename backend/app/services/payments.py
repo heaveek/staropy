@@ -35,10 +35,13 @@ class PaymentProvider(Protocol):
 
 
 class TelegramStarsProvider:
-    """Creates a Telegram invoice with Stars via Bot API sendMessage.
+    """Creates a Telegram Stars invoice link via Bot API createInvoiceLink.
 
-    Requires TELEGRAM_BOT_TOKEN. In environments without network/token access
-    the call fails explicitly — payments stay disabled by default.
+    NOTE: sendInvoice returns a *Message* object (it sends the invoice into a
+    chat) and has no invoice_link field. For Mini App payment flows the correct
+    method is createInvoiceLink, which returns the payment URL string directly.
+    Requires TELEGRAM_BOT_TOKEN. Without token/network the call fails
+    explicitly — payments stay disabled by default.
     """
 
     name = "telegram_stars"
@@ -53,18 +56,19 @@ class TelegramStarsProvider:
 
             api = f"https://api.telegram.org/bot{settings.telegram_bot_token}"
             body = {
-                "chat_id": telegram_id,
                 "title": product.name,
                 "description": product.description or product.name,
                 "payload": payload,
                 "currency": currency,
                 "prices": [{"label": product.name, "amount": product.price_amount}],
             }
-            resp = httpx.post(f"{api}/sendInvoice", json=body, timeout=10)
+            resp = httpx.post(f"{api}/createInvoiceLink", json=body, timeout=10)
             data = resp.json()
             if not data.get("ok"):
                 return InvoiceResult(ok=False, error=str(data.get("description", "provider_error"))[:200])
-            url = data["result"].get("invoice_link")
+            url = data.get("result")
+            if not isinstance(url, str) or not url.startswith("https://"):
+                return InvoiceResult(ok=False, error="malformed_invoice_link_response")
             return InvoiceResult(ok=True, bot_invoice_url=url)
         except Exception as exc:  # pragma: no cover
             return InvoiceResult(ok=False, error=f"provider_unavailable:{type(exc).__name__}")
@@ -132,14 +136,22 @@ def create_payment(session: Session, user: User, product_code: str) -> tuple[Pay
 
 def confirm_payment(session: Session, external_payment_id: str, telegram_id: int,
                     successful: bool, raw: dict | None = None) -> Payment:
-    """Idempotent confirmation driven by pre_checkout_query / successful_payment.
+    """Idempotent confirmation driven by a verified Telegram payment event.
 
-    Only Telegram-verified events may confirm; amounts must match the product.
+    Security rules (spec §14):
+      - the caller must be the bot handler of an authenticated getUpdates/
+        webhook payload (successful_payment inside a Message), never a
+        client-facing endpoint;
+      - invoice_payload must match a stored Payment row;
+      - telegram_id must match the payment owner;
+      - the ACTUAL amounts from the Telegram event (total_amount, currency)
+        are compared against the stored payment AND the product price;
+      - external_payment_id is unique per entitlement (replay-safe).
+    Premium is granted only after all checks pass.
     """
-    stmt = select(Payment).where(Payment.invoice_payload.is_not(None))
-    # Find payment by telegram payload embedded in provider data
+    raw = raw or {}
     payment: Payment | None = None
-    if raw and raw.get("payload"):
+    if raw.get("payload"):
         payment = session.scalar(select(Payment).where(Payment.invoice_payload == raw["payload"]))
     if payment is None and external_payment_id:
         payment = session.scalar(select(Payment).where(Payment.external_payment_id == external_payment_id))
@@ -151,25 +163,50 @@ def confirm_payment(session: Session, external_payment_id: str, telegram_id: int
         raise ApiError("forbidden", "Несовпадение пользователя платежа", 403)
 
     if payment.status == "paid":
-        return payment  # idempotent replay
+        # Idempotent replay: same external id => ok; different id on a paid
+        # invoice is suspicious and rejected.
+        if external_payment_id and payment.external_payment_id and \
+                payment.external_payment_id != external_payment_id:
+            raise ApiError("payment_conflict", "Дублирующийся идентификатор платежа", 409)
+        return payment
 
     if not successful:
         payment.status = "failed"
-        payment.raw_provider_data = raw or {}
+        payment.raw_provider_data = raw
         session.commit()
         return payment
 
     product = session.scalar(select(Product).where(Product.product_code == payment.product_code))
-    if product is None or product.price_amount != payment.amount:
+    if product is None:
         payment.status = "failed"
-        payment.raw_provider_data = {**(raw or {}), "error": "amount_mismatch"}
+        payment.raw_provider_data = {**raw, "error": "product_missing"}
         session.commit()
-        raise ApiError("payment_amount_mismatch", "Расхождение суммы платежа", 500)
+        raise ApiError("payment_failed", "Товар платежа не найден", 500)
+
+    # Verify the REAL money that arrived, not just what we stored locally.
+    actual_amount = raw.get("total_amount")
+    actual_currency = raw.get("currency")
+    if actual_amount is None or actual_currency is None:
+        payment.status = "failed"
+        payment.raw_provider_data = {**raw, "error": "missing_event_amount"}
+        session.commit()
+        raise ApiError("payment_invalid_event",
+                       "Событие платежа не содержит подтверждённую сумму", 400)
+    try:
+        actual_amount = int(actual_amount)
+    except (TypeError, ValueError):
+        actual_amount = -1
+    if (actual_amount != payment.amount or actual_amount != product.price_amount
+            or actual_currency != payment.currency):
+        payment.status = "failed"
+        payment.raw_provider_data = {**raw, "error": "amount_mismatch"}
+        session.commit()
+        raise ApiError("payment_amount_mismatch", "Расхождение суммы или валюты платежа", 400)
 
     payment.status = "paid"
     payment.paid_at = utcnow()
     payment.external_payment_id = external_payment_id or payment.external_payment_id
-    payment.raw_provider_data = raw or {}
+    payment.raw_provider_data = raw
     grant_premium(
         session,
         user_id=user.id,

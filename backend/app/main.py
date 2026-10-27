@@ -5,6 +5,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .api.routes import auth, catalog, payments, preferences, readings
 from .config import get_settings
@@ -56,7 +57,9 @@ def create_app() -> FastAPI:
             return {"ok": True}
         except Exception as exc:
             logger.warning("readiness failed: %s", type(exc).__name__)
-            return error_body("unavailable", "Сервис временно недоступен")
+            # Readiness MUST fail with a non-2xx status so orchestrators/healthchecks react.
+            return JSONResponse(status_code=503,
+                                content=error_body("unavailable", "Сервис временно недоступен"))
 
     # Dev convenience: create tables if missing. Alembic owns production migrations.
     from .db.base import Base
