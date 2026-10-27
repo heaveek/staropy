@@ -1,8 +1,19 @@
+# Python caches
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Secrets: never commit real env files (keep .env.example)
 .env
 .env.local
 .env.*
+!.env.example
 
 # Git bundle backup (local progress snapshot)
 backup-tarot-progress.bundle
+
+# Node / frontend
+node_modules/
+dist/
+build/
+coverage/
