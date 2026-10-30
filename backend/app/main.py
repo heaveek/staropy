@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api.routes import auth, catalog, payments, preferences, readings
+from .api.routes import auth, catalog, internal, payments, preferences, readings
 from .config import get_settings
 from .core.errors import error_body, install_error_handlers
 from .core.logging import setup_logging
@@ -77,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(preferences.router, prefix=prefix)
     app.include_router(payments.premium_router, prefix=prefix)
     app.include_router(payments.payments_router, prefix=prefix)
+    app.include_router(internal.router, prefix=prefix)
     return app
 
 

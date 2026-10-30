@@ -41,6 +41,17 @@ class PaymentCreateRequest(BaseModel):
     product_code: str = Field(min_length=1, max_length=48)
 
 
+class InternalPaymentEventRequest(BaseModel):
+    """Payment event forwarded by the trusted bot after Telegram verification."""
+    telegram_id: int = Field(gt=0)
+    external_payment_id: str = Field(min_length=1, max_length=128)
+    total_amount: int = Field(ge=0)
+    currency: str = Field(min_length=3, max_length=8)
+    invoice_payload: str = Field(min_length=1, max_length=128)
+    successful: bool = True
+    provider: str | None = Field(default=None, max_length=24)
+
+
 # ---------------------------------------------------------------- responses
 
 class OkResponse(BaseModel):
