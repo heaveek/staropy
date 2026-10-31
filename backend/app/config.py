@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     payments_enabled: bool = False
     payment_provider: str = "telegram_stars"
 
+    # Shared secret for the internal API (bot -> backend payment events).
+    # Empty means the internal endpoints are disabled (fail closed).
+    internal_api_secret: str = ""
+
     # Development-only auth escape hatch. Never allowed in production.
     allow_dev_auth: bool = False
 

@@ -5,6 +5,8 @@ and build correctly-signed initData strings via the same HMAC algorithm.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import sys
@@ -22,6 +24,7 @@ os.environ["PAYMENTS_ENABLED"] = "false"
 os.environ["PAYMENT_PROVIDER"] = "stub"
 os.environ["FREE_READINGS_PER_DAY"] = "1"
 os.environ["FREE_HISTORY_LIMIT"] = "3"
+os.environ["INTERNAL_API_SECRET"] = "test_internal_secret_not_a_real_token"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -97,3 +100,16 @@ def user_headers(tg_id: int = 111, **extra) -> dict:
 def fresh_tg_id():
     """Unique telegram id per test to avoid quota cross-contamination."""
     return 900_000_000 + uuid.uuid4().int % 100_000_000
+
+
+INTERNAL_SECRET = os.environ["INTERNAL_API_SECRET"]
+
+
+def sign_internal(body: bytes, secret: str = INTERNAL_SECRET) -> str:
+    """HMAC-SHA256 over the exact request body (matches bot/backend_client)."""
+    return hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+
+
+def internal_headers(body: bytes, secret: str = INTERNAL_SECRET) -> dict:
+    return {"Content-Type": "application/json",
+            "X-Internal-Signature": sign_internal(body, secret)}
