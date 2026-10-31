@@ -22,6 +22,10 @@ from ..tarot_content import spreads as spread_defs
 from ..tarot_content import tags as tag_defs
 
 
+# Content edition served to users; bumped when editorial texts are reworked.
+CONTENT_VERSION = "v2"
+
+
 @dataclass(frozen=True)
 class SeedReport:
     created: dict
@@ -198,6 +202,20 @@ def load_content(session: Session) -> SeedReport:
                 CardMeaning.orientation == "upright",
             )
         )
+        if exists is not None and (
+            exists.content_version != CONTENT_VERSION
+            or m.text_long != exists.text_long
+            or m.text_short != exists.text_short
+            or m.priority != exists.priority
+        ):
+            # Editorial refresh (v2): serve the new long-form text without
+            # duplicating rows; keeps seeding idempotent for fresh databases.
+            exists.text_short = m.text_short
+            exists.text_long = m.text_long
+            exists.priority = m.priority
+            exists.content_version = CONTENT_VERSION
+            session.flush()
+            continue
         if exists is None:
             # MVP draws upright cards only (spec §8); reversed meanings are not
             # seeded until reversal content is prepared.
@@ -206,7 +224,7 @@ def load_content(session: Session) -> SeedReport:
                 meaning_type=m.meaning_type, orientation="upright",
                 text_short=m.text_short, text_long=m.text_long,
                 priority=m.priority, review_status=m.review_status,
-                content_version="v1",
+                content_version=CONTENT_VERSION,
             )
             session.add(nm)
             session.flush()
@@ -305,6 +323,28 @@ def load_content(session: Session) -> SeedReport:
                                                template_text=text, priority=prio))
             n += 1
     created["interpretation_templates"] = n
+
+    # Per-card editorial advice rules mirrored into the DB with
+    # `advice:<card_code>[:<theme>]` keys (composer cascade level 0).
+    # Theme scoping lives in the key itself, so rows stay theme_id-agnostic.
+    from ..tarot_content.card_advice import CARD_ADVICE_RULES
+    n_pc = 0
+    for (card_code, theme_code_), adv_text in CARD_ADVICE_RULES.items():
+        pc = f"advice:{card_code}" + (f":{theme_code_}" if theme_code_ else "")
+        exists_tpl = session.scalar(select(InterpretationTemplate).where(
+            InterpretationTemplate.template_type == "advice",
+            InterpretationTemplate.position_code == pc,
+        ))
+        if exists_tpl is None:
+            session.add(InterpretationTemplate(
+                template_type="advice", spread_id=None, theme_id=None,
+                position_code=pc, template_text=adv_text, priority=60,
+            ))
+            n_pc += 1
+        elif exists_tpl.template_text != adv_text:
+            exists_tpl.template_text = adv_text
+            session.flush()
+    created["advice_card_templates"] = n_pc
 
     # products — inactive by default (activation is an explicit separate step)
     n = 0

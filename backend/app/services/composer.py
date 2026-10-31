@@ -99,8 +99,18 @@ class ComposedReading:
         }
 
 
-def _pick_template(session: Session, spread_id: int, theme_id: int, template_type: str) -> str | None:
-    """Theme+spread specific first; then theme; then generic approved block."""
+def _pick_template(
+    session: Session,
+    spread_id: int,
+    theme_id: int,
+    template_type: str,
+    position_code: str | None = None,
+) -> str | None:
+    """Theme+spread specific first; then theme; then generic approved block.
+
+    When `position_code` is given (per-card advice keys like
+    `advice:<card_code>:<theme>`), only rows carrying that key are considered.
+    """
     stmt = (
         select(InterpretationTemplate)
         .where(
@@ -110,6 +120,10 @@ def _pick_template(session: Session, spread_id: int, theme_id: int, template_typ
         )
         .order_by(InterpretationTemplate.priority.desc(), InterpretationTemplate.id.asc())
     )
+    if position_code is not None:
+        stmt = stmt.where(InterpretationTemplate.position_code == position_code)
+        row = session.scalar(stmt)
+        return row.template_text if row else None
     rows = list(session.scalars(stmt))
     exact = [r for r in rows if r.spread_id == spread_id and r.theme_id == theme_id]
     themed = [r for r in rows if r.spread_id is None and r.theme_id == theme_id]
@@ -178,7 +192,8 @@ def compose_reading(
             sel = select_position_meaning(session, card.id, orientation, theme.id, pos)
             prefix = f"{pos.name_ru}: " if spread.code != "daily_card" else ""
             orient_note = " (перевёрнутое положение)" if orientation == "reversed" else ""
-            rendered = f"{prefix}{sel.text}{orient_note}".strip()
+            body = sel.text_long or sel.text
+            rendered = f"{prefix}{body}{orient_note}".strip()
             meaning_id, source = sel.meaning_id, sel.source
 
         results.append(PositionResult(
@@ -283,6 +298,13 @@ def compose_advice(
     anchor = _anchor_position(results)
     if anchor is None:
         return _legacy_generic_advice(session, spread_id, theme_id)
+
+    # 0: per-card editorial rules stored as DB templates
+    # (`advice:<card_code>:<theme>` overrides `advice:<card_code>`).
+    for pc in (f"advice:{anchor.card_code}:{theme_code}", f"advice:{anchor.card_code}"):
+        db_text = _pick_template(session, spread_id, theme_id, "advice", position_code=pc)
+        if db_text is not None:
+            return db_text
 
     # 1/2: editorial per-card rules (themed variant wins over the generic one).
     from ..tarot_content.card_advice import CARD_ADVICE_RULES

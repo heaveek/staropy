@@ -196,6 +196,7 @@ class InterpretationTemplate(Base):
     spread_id: Mapped[int | None] = mapped_column(ForeignKey("spreads.id"))
     theme_id: Mapped[int | None] = mapped_column(ForeignKey("themes.id"))
     template_type: Mapped[str] = mapped_column(String(16), nullable=False)  # opening|position|summary|advice|disclaimer
+    position_code: Mapped[str | None] = mapped_column(String(96))  # e.g. "advice:<card_code>:<theme>" per-card rules
     template_text: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

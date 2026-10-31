@@ -416,7 +416,14 @@ CARD_TAGS_RAW: list[tuple[str, list[str]]] = [
 
 
 def all_meanings() -> list[MeaningDef]:
-    return _general_entries() + _themed_entries() + ROLE_BLOCKS
+    from .long_texts import build_meaning_entries
+    # Long-form editorial blocks (v2) override terse v1 rows for the same
+    # (card, theme, meaning_type) key; everything else keeps v1 content.
+    long_rows = build_meaning_entries()
+    long_keys = {(r.card_code, r.theme, r.meaning_type) for r in long_rows}
+    base = [m for m in (_general_entries() + _themed_entries() + ROLE_BLOCKS)
+            if (m.card_code, m.theme, m.meaning_type) not in long_keys]
+    return long_rows + base
 
 
 def all_yes_no() -> list[YesNoDef]:

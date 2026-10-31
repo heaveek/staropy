@@ -25,6 +25,7 @@ class SelectedMeaning:
     meaning_id: int | None
     text: str
     source: str  # themed_role|themed|universal_role|universal|fallback
+    text_long: str = ""
 
 
 def _meanings(session: Session, card_id: int, orientation: str) -> list[CardMeaning]:
@@ -62,23 +63,23 @@ def select_position_meaning(
     if theme_id is not None:
         for m in rows:
             if matches(m, theme=True, role_type=True):
-                return SelectedMeaning(m.id, m.text_short, "themed_role")
+                return SelectedMeaning(m.id, m.text_short, "themed_role", m.text_long)
         # 2. exact theme + general
         for m in rows:
             if matches(m, theme=True, role_type=False):
-                return SelectedMeaning(m.id, m.text_short, "themed")
+                return SelectedMeaning(m.id, m.text_short, "themed", m.text_long)
     # 3. universal + suitable role
     for m in rows:
         if m.theme_id is None and matches(m, theme=False, role_type=True):
-            return SelectedMeaning(m.id, m.text_short, "universal_role")
+            return SelectedMeaning(m.id, m.text_short, "universal_role", m.text_long)
     # 4. universal + general
     for m in rows:
         if m.theme_id is None and matches(m, theme=False, role_type=False):
-            return SelectedMeaning(m.id, m.text_short, "universal")
+            return SelectedMeaning(m.id, m.text_short, "universal", m.text_long)
 
     # Any other approved row beats the neutral fallback (better than nothing).
     if rows:
-        return SelectedMeaning(rows[0].id, rows[0].text_short, "universal")
+        return SelectedMeaning(rows[0].id, rows[0].text_short, "universal", rows[0].text_long)
 
     # 5. neutral fallback: name the card, say the text is being prepared.
     card = session.get(Card, card_id)
