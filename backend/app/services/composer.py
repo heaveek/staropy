@@ -14,7 +14,13 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..core.errors import ApiError
-from ..models import Card, InterpretationTemplate, Spread, Theme, User
+from ..models import Card, CardTag, InterpretationTemplate, Spread, Tag, Theme, User
+from ..tarot_content.advice import (
+    GENERIC_ADVICE_FRAME,
+    POSITION_ROLE_FRAMES,
+    THEME_ADVICE_FRAMES,
+    select_tag_advice,
+)
 from . import combinations as combos
 from .content_selector import select_position_meaning, select_yes_no
 from .rng import draw_cards
@@ -23,6 +29,11 @@ from .timeutil import utcnow
 DISCLAIMER_DEFAULT = (
     "Расклад носит развлекательно-рефлексивный характер и не является медицинским, "
     "юридическим или финансовым советом."
+)
+
+UNIVERSAL_ADVICE_TEXT = (
+    "Выберите одно маленькое действие, которое зависит только от вас, "
+    "и сделайте его сегодня."
 )
 
 
@@ -39,6 +50,7 @@ class PositionResult:
     meaning_source: str
     selected_meaning_id: int | None
     rendered_text: str
+    interpretation_role: str = "general"
 
 
 @dataclass
@@ -181,6 +193,7 @@ def compose_reading(
             meaning_source=source,
             selected_meaning_id=meaning_id,
             rendered_text=rendered,
+            interpretation_role=pos.interpretation_role,
         ))
 
     drawn_ids = [r.card_id for r in results]
@@ -192,7 +205,7 @@ def compose_reading(
         f"Расклад «{spread.name_ru}» на тему «{theme.name_ru}»."
     )
     summary = _pick_template(session, spread.id, theme.id, "summary") or _default_summary(results)
-    advice = _pick_template(session, spread.id, theme.id, "advice")
+    advice = compose_advice(session, results, theme.code, spread.id, theme.id)
     disclaimer = _pick_template(session, spread.id, theme.id, "disclaimer") or DISCLAIMER_DEFAULT
 
     return ComposedReading(
@@ -213,3 +226,91 @@ def compose_reading(
 def _default_summary(positions: list[PositionResult]) -> str:
     names = ", ".join(p.card_name_ru for p in positions)
     return f"Выпавшие карты — {names}. Вернитесь к позиции, которая отозвалась сильнее всего."
+
+
+# ---------------------------------------------------------------- advice
+
+def _card_tags(session: Session, card_id: int) -> set[str]:
+    """Approved tag codes of a card. Empty set when tags are not seeded yet."""
+    stmt = (
+        select(Tag.code)
+        .join(CardTag, CardTag.tag_id == Tag.id)
+        .where(
+            CardTag.card_id == card_id,
+            CardTag.review_status == "approved",
+            Tag.is_active.is_(True),
+        )
+        .order_by(CardTag.weight.desc(), CardTag.id.asc())
+    )
+    return set(session.scalars(stmt))
+
+
+def _anchor_position(results: list[PositionResult]) -> PositionResult | None:
+    """Deterministic anchor for advice: explicit advice-role position first,
+    then challenge, resource, outcome/answer, finally the first position."""
+    for wanted in ("advice", "challenge", "resource", "outcome", "answer"):
+        for r in results:
+            if r.interpretation_role == wanted:
+                return r
+    return results[0] if results else None
+
+
+def _synth_advice(meaning_text: str, role: str, theme_code: str) -> str:
+    frame = THEME_ADVICE_FRAMES.get(theme_code, GENERIC_ADVICE_FRAME)
+    text = meaning_text.strip().rstrip(".") + "."
+    body = frame.format(meaning=text)
+    prefix = POSITION_ROLE_FRAMES.get(role, "")
+    return f"{prefix}{body}".strip()
+
+
+def compose_advice(
+    session: Session,
+    results: list[PositionResult],
+    theme_code: str,
+    spread_id: int,
+    theme_id: int,
+) -> str:
+    """Context-dependent advice with a deterministic cascade:
+
+    1. DB template `advice:<card_code>:<theme>` — editorial per-card themed rule;
+    2. DB template `advice:<card_code>` — editorial per-card rule;
+    3. tag rules from the content table (tags x theme, priority-ranked);
+    4. synthesis from the anchor card's selected meaning + position role + theme;
+    5. legacy generic template only as a last resort (kept for old content).
+
+    Same inputs always produce the same output; no randomness, no LLM.
+    """
+    anchor = _anchor_position(results)
+    if anchor is None:
+        return _legacy_generic_advice(session, spread_id, theme_id)
+
+    # 1/2: editorial per-card rules (themed variant wins over the generic one).
+    from ..tarot_content.card_advice import CARD_ADVICE_RULES
+    for key in ((anchor.card_code, theme_code), (anchor.card_code, None)):
+        text = CARD_ADVICE_RULES.get(key)
+        if text is not None:
+            return text
+
+    # 3: tag-based rules from the editorial content table.
+    tags = _card_tags(session, anchor.card_id)
+    if tags:
+        match = select_tag_advice(tags, theme_code)
+        if match is not None:
+            return match[1]
+
+    # 4: meaningful synthesis from the actual selected meaning of the card.
+    if anchor.meaning_source != "fallback":
+        return _synth_advice(anchor.rendered_text, anchor.interpretation_role, theme_code)
+
+    # 5: last resort — legacy generic template (never the universal stub alone).
+    legacy = _pick_template(session, spread_id, theme_id, "advice")
+    if legacy and legacy != UNIVERSAL_ADVICE_TEXT:
+        return legacy
+    return _synth_advice(anchor.rendered_text, anchor.interpretation_role, theme_code)
+
+
+def _legacy_generic_advice(session: Session, spread_id: int, theme_id: int) -> str:
+    legacy = _pick_template(session, spread_id, theme_id, "advice")
+    if legacy and legacy != UNIVERSAL_ADVICE_TEXT:
+        return legacy
+    return "Сведите трактовку к одному проверяемому шагу: выберите позицию, которая отозвалась сильнее всего, и сделайте по ней одно действие сегодня."

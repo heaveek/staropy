@@ -103,7 +103,10 @@ TEMPLATES: list[tuple[str, str | None, str, str, int]] = [
     # (template_type, spread_code|None, theme_code|None, text, priority)
     ("opening", None, None, "Расклад помогает посмотреть на ситуацию с разных сторон. Воспринимайте образы как подсказки для размышления, а не как предписание.", 0),
     ("summary", None, None, "Главное — не отдельная карта, а линия между ними. Отметьте, какая позиция вызвала самый сильный отклик.", 0),
-    ("advice", None, None, "Выберите одно маленькое действие, которое зависит только от вас, и сделайте его сегодня.", 0),
+    # Legacy universal stub: kept in the table for old-content compatibility but
+    # never served as advice — the composer now builds context-dependent advice
+    # from card tags/meanings/positions (see app/tarot_content/advice.py).
+    ("advice", None, None, "Выберите одно маленькое действие, которое зависит только от вас, и сделайте его сегодня.", -100),
     ("disclaimer", None, None, "Расклад носит развлекательно-рефлексивный характер и не является медицинским, юридическим или финансовым советом.", 0),
     ("opening", None, "love", "Тема близости: расклад показывает, где между вами течение, а где — сопротивление.", 10),
     ("summary", None, "love", "В отношениях важнее всего разговор: обсудите с партнёром позицию, которая отозвалась сильнее всего.", 10),
