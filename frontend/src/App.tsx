@@ -15,7 +15,7 @@ type Tab = "home" | "history" | "premium";
 type Route =
   | { tab: Tab }
   | { tab: "new"; spread: Spread; theme: Theme }
-  | { tab: "result"; readingId: string };
+  | { tab: "result"; readingId: string; fromHistory?: boolean };
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Расклад", icon: "🃏" },
@@ -78,13 +78,14 @@ export default function App() {
         {route.tab === "result" && (
           <ReadingResultPage
             readingId={route.readingId}
+            instant={"fromHistory" in route && !!route.fromHistory}
             onBack={() => setRoute({ tab: "home" })}
             onPremium={() => setRoute({ tab: "premium" })}
           />
         )}
         {route.tab === "history" && (
           <HistoryPage
-            onOpen={(readingId) => setRoute({ tab: "result", readingId })}
+            onOpen={(readingId) => setRoute({ tab: "result", readingId, fromHistory: true })}
             onPremium={() => setRoute({ tab: "premium" })}
           />
         )}

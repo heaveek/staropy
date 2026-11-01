@@ -95,6 +95,12 @@ describe("App bootstrap", () => {
   });
 
   it("creates a reading via POST /readings and shows the result screen", async () => {
+    // The shuffle/flip ritual is timer-based; tests assert the final state, so skip it.
+    vi.spyOn(window, "matchMedia").mockImplementation((q: string) => ({
+      matches: q.includes("prefers-reduced-motion"),
+      media: q, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }) as unknown as MediaQueryList);
     const user = userEvent.setup();
     render(<App />);
     await waitFor(() => expect(screen.getByText("Таро-расклады")).toBeInTheDocument());
